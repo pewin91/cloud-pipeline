@@ -69,7 +69,7 @@ ALIGNMENT_PROMPT = os.getenv("ALIGNMENT_PROMPT", "")
 # ─── Estado global ────────────────────────────────────────
 _state = {
     "active":     True,
-    "mode":       os.getenv("DEFAULT_MODE", "both"),  # auto | manual | both
+    "mode":       "auto",
     "debug":      False,
     "processing": False,
     "processed":  0,
@@ -85,7 +85,7 @@ _wd = {
     "active":            False,
     "target_url":        os.getenv("WD_TARGET_URL", ""),
     "check_interval":    int(os.getenv("WD_INTERVAL", "120")),
-    "stuck_timeout":     int(os.getenv("WD_STUCK", "300")),
+    "stuck_timeout":     int(os.getenv("WD_STUCK", "120")),
     "consecutive_fails": 0,
     "processing_since":  None,
     "last_check":        0,
@@ -106,41 +106,45 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   header{background:#161b22;border-bottom:1px solid #30363d;padding:12px 20px;display:flex;align-items:center;gap:16px}
   header h1{font-size:16px;color:#58a6ff}
   .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
-  .dot.green{background:#3fb950} .dot.red{background:#f85149} .dot.yellow{background:#d29922}
-  .grid{display:grid;grid-template-columns:280px 1fr;gap:0;height:calc(100vh - 50px)}
-  .sidebar{background:#161b22;border-right:1px solid #30363d;padding:16px;display:flex;flex-direction:column;gap:16px;overflow-y:auto}
+  .dot.green{background:#3fb950}.dot.red{background:#f85149}.dot.yellow{background:#d29922}
+  .grid{display:grid;grid-template-columns:260px 1fr 230px;gap:0;height:calc(100vh - 50px)}
+  .sidebar{background:#161b22;border-right:1px solid #30363d;padding:14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+  .flowpanel{background:#161b22;border-left:1px solid #30363d;padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:0}
   .card{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px}
   .card h3{color:#8b949e;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
   .stat{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #21262d}
   .stat:last-child{border-bottom:none}
-  .stat .label{color:#8b949e}
-  .stat .value{color:#e6edf3;font-weight:bold}
+  .stat .label{color:#8b949e}.stat .value{color:#e6edf3;font-weight:bold}
   .btn-group{display:flex;flex-direction:column;gap:6px}
   .btn{padding:7px 12px;border:1px solid #30363d;border-radius:5px;background:#21262d;color:#c9d1d9;
        cursor:pointer;font-family:inherit;font-size:12px;text-align:left;transition:all .15s}
   .btn:hover{background:#30363d;border-color:#58a6ff}
-  .btn.active{background:#1f6feb;border-color:#388bfd;color:#fff}
-  .btn.danger{border-color:#da3633} .btn.danger:hover{background:#da3633;color:#fff}
-  .btn.success{border-color:#2ea043} .btn.success:hover{background:#2ea043;color:#fff}
+  .btn.danger{border-color:#da3633}.btn.danger:hover{background:#da3633;color:#fff}
+  .btn.success{border-color:#2ea043}.btn.success:hover{background:#2ea043;color:#fff}
   .console{background:#0d1117;padding:12px;overflow-y:auto;height:calc(100vh - 50px);font-size:12px;line-height:1.6}
   .log-line{padding:1px 0;border-bottom:1px solid #161b22;white-space:pre-wrap;word-break:break-all}
-  .log-line.error{color:#f85149}
-  .log-line.warn{color:#d29922}
-  .log-line.info{color:#c9d1d9}
-  .log-line .ts{color:#484f58;margin-right:6px}
-  .log-line .lvl{margin-right:8px;font-weight:bold}
-  .log-line.error .lvl{color:#f85149}
-  .log-line.warn .lvl{color:#d29922}
-  .log-line.info .lvl{color:#3fb950}
-  .badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:bold}
-  .badge.auto{background:#1f3a5c;color:#58a6ff}
-  .badge.manual{background:#3d2b1f;color:#d29922}
-  .badge.both{background:#1f3a2a;color:#3fb950}
-  #answer-flash{display:none;background:#1f6feb;color:#fff;padding:12px;border-radius:6px;
-                text-align:center;font-size:20px;font-weight:bold;margin-bottom:8px;animation:flash .5s}
-  @keyframes flash{0%{transform:scale(1.05)}100%{transform:scale(1)}}
-  .mode-btns{display:flex;gap:6px}
-  .mode-btns .btn{flex:1;text-align:center}
+  .log-line.error{color:#f85149}.log-line.warn{color:#d29922}.log-line.info{color:#c9d1d9}
+  .log-line .ts{color:#484f58;margin-right:6px}.log-line .lvl{margin-right:8px;font-weight:bold}
+  .log-line.error .lvl{color:#f85149}.log-line.warn .lvl{color:#d29922}.log-line.info .lvl{color:#3fb950}
+  #answer-flash{display:none;background:#1f6feb;color:#fff;padding:10px;border-radius:6px;
+                text-align:center;font-size:18px;font-weight:bold;margin-bottom:8px}
+  /* ── Flow diagram ── */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;padding:8px 0}
+  .fbox{width:100%;border:2px solid #30363d;border-radius:8px;background:#0d1117;
+        padding:10px 8px;text-align:center;font-size:11px;line-height:1.4;transition:all .3s;position:relative}
+  .fbox .ftitle{font-weight:bold;font-size:12px;margin-bottom:4px}
+  .fbox .fsub{color:#8b949e;font-size:10px}
+  .fbox.active{border-color:#58a6ff;background:#0d2137;box-shadow:0 0 12px #1f6feb55}
+  .fbox.done{border-color:#2ea043;background:#0d1f12}
+  .fbox.fail{border-color:#da3633;background:#1f0d0d}
+  .fbox.warn{border-color:#d29922;background:#1f1a0d}
+  .farrow{color:#484f58;font-size:18px;text-align:center;line-height:1;margin:2px 0}
+  .fbranch{display:flex;gap:6px;width:100%;margin:2px 0}
+  .fbranch .fbox{font-size:10px;padding:7px 4px}
+  .fbox .fbadge{display:inline-block;margin-top:4px;padding:2px 6px;border-radius:8px;
+                font-size:10px;font-weight:bold;background:#21262d;color:#c9d1d9}
+  .fp-title{color:#8b949e;font-size:11px;text-transform:uppercase;letter-spacing:1px;
+            margin-bottom:10px;text-align:center;padding-bottom:6px;border-bottom:1px solid #30363d}
 </style>
 </head>
 <body>
@@ -151,19 +155,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <span style="margin-left:auto;color:#484f58;font-size:11px" id="hdr-uptime"></span>
 </header>
 <div class="grid">
+
+  <!-- ── SIDEBAR ── -->
   <div class="sidebar">
     <div id="answer-flash"></div>
-
     <div class="card">
       <h3>Estado</h3>
       <div class="stat"><span class="label">Pipeline</span><span class="value" id="s-status">—</span></div>
-      <div class="stat"><span class="label">Modo</span><span class="value" id="s-mode">—</span></div>
       <div class="stat"><span class="label">Procesados</span><span class="value" id="s-processed">0</span></div>
       <div class="stat"><span class="label">Última resp.</span><span class="value" id="s-last">—</span></div>
-      <div class="stat"><span class="label">Fuente</span><span class="value" id="s-src">—</span></div>
       <div class="stat"><span class="label">Errores</span><span class="value" id="s-errors">0</span></div>
     </div>
-
     <div class="card">
       <h3>Control</h3>
       <div class="btn-group">
@@ -171,157 +173,196 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <button class="btn danger"  onclick="ctrl('stop')">■ Desactivar pipeline</button>
       </div>
     </div>
-
     <div class="card">
-      <h3>Modo</h3>
-      <div class="mode-btns">
-        <button class="btn" id="btn-auto"   onclick="ctrl('mode_auto')">Auto</button>
-        <button class="btn" id="btn-manual" onclick="ctrl('mode_manual')">Manual</button>
-        <button class="btn" id="btn-both"   onclick="ctrl('mode_both')">Ambos</button>
-      </div>
-      <div style="color:#484f58;font-size:10px;margin-top:8px">
-        <b>Auto</b>: monitorea Gmail<br>
-        <b>Manual</b>: foto por Telegram<br>
-        <b>Ambos</b>: Gmail + Telegram
-      </div>
+      <h3>Fuente</h3>
+      <div style="color:#3fb950;font-size:11px;padding:4px 0">🟢 AUTO — Gmail</div>
+      <div style="color:#484f58;font-size:10px">pewintest@gmail.com · poll 8s</div>
     </div>
-
-    <div class="card">
-      <h3>Info</h3>
-      <div class="stat"><span class="label">Gmail</span><span class="value" style="font-size:10px">pewintest@</span></div>
-      <div class="stat"><span class="label">Poll</span><span class="value">8s</span></div>
-      <div class="stat"><span class="label">OCR</span><span class="value">Gemini→GPT→Claude</span></div>
-      <div class="stat"><span class="label">Ans</span><span class="value">Paralelo (votación)</span></div>
-    </div>
-
     <div class="card">
       <h3>🐕 Watchdog</h3>
-      <div class="stat">
-        <span class="label">Estado</span>
-        <span class="value" id="wd-status">🔴 INACTIVO</span>
-      </div>
-      <div class="stat">
-        <span class="label">Target</span>
-        <span class="value" id="wd-target" style="font-size:9px;word-break:break-all">—</span>
-      </div>
-      <div class="stat">
-        <span class="label">Último check</span>
-        <span class="value" id="wd-last">nunca</span>
-      </div>
-      <div class="stat">
-        <span class="label">Pipeline</span>
-        <span class="value" id="wd-pc">—</span>
-      </div>
-      <div class="stat">
-        <span class="label">Fallos</span>
-        <span class="value" id="wd-fails">0</span>
-      </div>
-      <div style="margin-top:10px">
+      <div class="stat"><span class="label">Estado</span><span class="value" id="wd-status">🔴</span></div>
+      <div class="stat"><span class="label">Check</span><span class="value" id="wd-last">nunca</span></div>
+      <div class="stat"><span class="label">PC</span><span class="value" id="wd-pc">—</span></div>
+      <div class="stat"><span class="label">Fallos</span><span class="value" id="wd-fails">0</span></div>
+      <div style="margin-top:8px">
         <input id="wd-url-input" type="text" placeholder="URL a monitorear"
           style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:4px;
-                 padding:6px 8px;color:#c9d1d9;font-family:inherit;font-size:11px;margin-bottom:6px">
+                 padding:5px 7px;color:#c9d1d9;font-family:inherit;font-size:10px;margin-bottom:5px">
         <div class="btn-group">
-          <button class="btn success" onclick="wdCtrl('start')">▶ Activar watchdog</button>
-          <button class="btn danger"  onclick="wdCtrl('stop')">■ Detener watchdog</button>
-          <button class="btn" onclick="wdCtrl('check_now')" style="border-color:#8b949e">⚡ Check ahora</button>
+          <button class="btn success" onclick="wdCtrl('start')" style="font-size:11px">▶ Activar</button>
+          <button class="btn danger"  onclick="wdCtrl('stop')"  style="font-size:11px">■ Detener</button>
+          <button class="btn" onclick="wdCtrl('check_now')"     style="font-size:11px;border-color:#8b949e">⚡ Check ya</button>
         </div>
       </div>
     </div>
-
     <div class="card">
       <h3>Consola</h3>
       <div class="btn-group">
-        <button class="btn" onclick="clearLogs()">🗑 Limpiar consola</button>
-        <button class="btn" id="btn-scroll" onclick="toggleScroll()">📌 Auto-scroll: ON</button>
+        <button class="btn" onclick="clearLogs()">🗑 Limpiar</button>
+        <button class="btn" id="btn-scroll" onclick="toggleScroll()">📌 Scroll: ON</button>
       </div>
     </div>
   </div>
 
+  <!-- ── CONSOLE ── -->
   <div id="console" class="console"></div>
+
+  <!-- ── FLOW DIAGRAM ── -->
+  <div class="flowpanel">
+    <div class="fp-title">📊 Diagrama de Flujo</div>
+    <div class="flow">
+
+      <div class="fbox" id="f-email">
+        <div class="ftitle">📧 Gmail</div>
+        <div class="fsub">pewintest@gmail.com<br>Poll cada 8s</div>
+      </div>
+      <div class="farrow">↓</div>
+
+      <div class="fbox" id="f-recv">
+        <div class="ftitle">📎 Imagen recibida</div>
+        <div class="fsub">Adjunto detectado<br>bytes descargados</div>
+      </div>
+      <div class="farrow">↓</div>
+
+      <div class="fbox" id="f-phase1">
+        <div class="ftitle">🖼 FASE 1</div>
+        <div class="fsub">Verificación encuadre<br>
+          <span class="fbadge">Gemini</span>
+          <span class="fbadge" style="color:#8b949e">fallback→</span>
+          <span class="fbadge">GPT</span>
+          <span class="fbadge">Claude</span>
+        </div>
+      </div>
+      <div class="farrow">↓</div>
+
+      <div class="fbranch">
+        <div class="fbox fail" id="f-invalid" style="flex:1">
+          <div class="ftitle" style="color:#f85149">❌ Inválido</div>
+          <div class="fsub">###Horizontal<br>###Vert Arriba<br>###Vert Abajo<br>###No veo</div>
+        </div>
+        <div class="fbox done" id="f-ok" style="flex:1">
+          <div class="ftitle" style="color:#3fb950">✅ Ok</div>
+          <div class="fsub">4 lados<br>visibles</div>
+        </div>
+      </div>
+      <div class="farrow">↓</div>
+
+      <div class="fbox" id="f-phase2">
+        <div class="ftitle">🎯 FASE 2</div>
+        <div class="fsub">Consenso paralelo<br>
+          <span class="fbadge">Gemini</span>
+          <span class="fbadge">GPT-4o</span>
+          <span class="fbadge">Claude</span>
+        </div>
+      </div>
+      <div class="farrow">↓</div>
+
+      <div class="fbox" id="f-vote">
+        <div class="ftitle">🗳 Votación</div>
+        <div class="fsub">Mayoría gana<br><span id="f-vote-detail" style="color:#58a6ff">—</span></div>
+      </div>
+      <div class="farrow">↓</div>
+
+      <div class="fbox" id="f-result">
+        <div class="ftitle">📲 Resultado</div>
+        <div class="fsub">→ Telegram<br><span id="f-last-ans" style="color:#3fb950;font-size:14px;font-weight:bold">—</span></div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
-
 <script>
-let logOffset = 0, autoScroll = true, lastProcessed = 0;
+let logOffset=0, autoScroll=true, lastProcessed=0, wasProcessing=false;
 
-function ctrl(action){
-  fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})})
-  .then(r=>r.json()).then(()=>fetchStatus());
+function ctrl(a){fetch('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})}).then(r=>r.json()).then(()=>fetchStatus());}
+function wdCtrl(a){const u=document.getElementById('wd-url-input').value.trim();fetch('/api/watchdog/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a,url:u})}).then(r=>r.json()).then(()=>fetchWatchdog());}
+function clearLogs(){document.getElementById('console').innerHTML='';logOffset=0;}
+function toggleScroll(){autoScroll=!autoScroll;document.getElementById('btn-scroll').textContent='📌 Scroll: '+(autoScroll?'ON':'OFF');}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function setFlow(active, last, processing){
+  const ids=['f-email','f-recv','f-phase1','f-invalid','f-ok','f-phase2','f-vote','f-result'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.classList.remove('active');
+    if(!['f-invalid','f-ok'].includes(id)) el.classList.remove('done','fail','warn');
+  });
+  if(!active) return;
+  if(processing){
+    ['f-email','f-recv','f-phase1'].forEach(id=>document.getElementById(id)?.classList.add('active'));
+  } else if(last){
+    const frameTokens=['Horizontal','Vert Arriba','Vert Abajo','No veo'];
+    const isFrame = frameTokens.some(t=>last===t);
+    document.getElementById('f-email').classList.add('done');
+    document.getElementById('f-recv').classList.add('done');
+    document.getElementById('f-phase1').classList.add('done');
+    if(isFrame){
+      document.getElementById('f-invalid').classList.add('active');
+      document.getElementById('f-result').classList.add('warn');
+    } else {
+      document.getElementById('f-ok').classList.add('done');
+      document.getElementById('f-phase2').classList.add('done');
+      document.getElementById('f-vote').classList.add('done');
+      document.getElementById('f-result').classList.add('done');
+    }
+    document.getElementById('f-last-ans').textContent='###'+last;
+  }
 }
-
-function wdCtrl(action){
-  const url = document.getElementById('wd-url-input').value.trim();
-  fetch('/api/watchdog/control',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action, url})})
-  .then(r=>r.json()).then(()=>fetchWatchdog());
-}
-
-function clearLogs(){ document.getElementById('console').innerHTML=''; logOffset=0; }
-function toggleScroll(){
-  autoScroll=!autoScroll;
-  document.getElementById('btn-scroll').textContent='📌 Auto-scroll: '+(autoScroll?'ON':'OFF');
-}
-
-function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function fetchStatus(){
   fetch('/api/status').then(r=>r.json()).then(d=>{
-    const dot = document.getElementById('hdr-dot');
-    dot.className = 'dot ' + (d.active ? (d.processing?'yellow':'green') : 'red');
-    document.getElementById('hdr-status').textContent = d.active?(d.processing?'Procesando...':'Esperando'):'Detenido';
-    const up = d.uptime_s, h=Math.floor(up/3600), m=Math.floor((up%3600)/60), s=up%60;
-    document.getElementById('hdr-uptime').textContent = `Uptime: ${h}h ${m}m ${s}s`;
-    document.getElementById('s-status').textContent = d.active?'🟢 ACTIVO':'🔴 INACTIVO';
-    document.getElementById('s-status').style.color = d.active?'#3fb950':'#f85149';
-    document.getElementById('s-mode').innerHTML = `<span class="badge ${d.mode}">${d.mode.toUpperCase()}</span>`;
-    document.getElementById('s-processed').textContent = d.processed;
-    document.getElementById('s-last').textContent = d.last || '—';
-    document.getElementById('s-src').textContent = d.last_src || '—';
-    document.getElementById('s-errors').textContent = d.errors;
-    ['auto','manual','both'].forEach(m=>{
-      document.getElementById('btn-'+m).className='btn'+(d.mode===m?' active':'');
-    });
-    if(d.processed > lastProcessed){
-      lastProcessed = d.processed;
-      const f = document.getElementById('answer-flash');
-      f.textContent = '###'+d.last;
-      f.style.display='block';
-      setTimeout(()=>{ f.style.display='none'; }, 3000);
+    document.getElementById('hdr-dot').className='dot '+(d.active?(d.processing?'yellow':'green'):'red');
+    document.getElementById('hdr-status').textContent=d.active?(d.processing?'Procesando...':'Esperando'):'Detenido';
+    const u=d.uptime_s,h=Math.floor(u/3600),m=Math.floor((u%3600)/60),s=u%60;
+    document.getElementById('hdr-uptime').textContent=`Uptime: ${h}h ${m}m ${s}s`;
+    document.getElementById('s-status').textContent=d.active?'🟢 ACTIVO':'🔴 INACTIVO';
+    document.getElementById('s-status').style.color=d.active?'#3fb950':'#f85149';
+    document.getElementById('s-processed').textContent=d.processed;
+    document.getElementById('s-last').textContent=d.last||'—';
+    document.getElementById('s-errors').textContent=d.errors;
+    if(d.processed>lastProcessed){
+      lastProcessed=d.processed;
+      const f=document.getElementById('answer-flash');
+      f.textContent='###'+d.last;f.style.display='block';
+      setTimeout(()=>{f.style.display='none';},3000);
     }
+    setFlow(d.active, d.last, d.processing);
   });
 }
 
 function fetchWatchdog(){
   fetch('/api/watchdog/status').then(r=>r.json()).then(d=>{
-    document.getElementById('wd-status').textContent  = d.active ? '🟢 ACTIVO' : '🔴 INACTIVO';
-    document.getElementById('wd-status').style.color  = d.active ? '#3fb950' : '#f85149';
-    document.getElementById('wd-target').textContent  = d.target_url || '—';
-    document.getElementById('wd-last').textContent    = d.last_check_str || 'nunca';
-    document.getElementById('wd-pc').textContent      = d.last_status || '—';
-    document.getElementById('wd-fails').textContent   = d.consecutive_fails;
-    if(d.target_url && !document.getElementById('wd-url-input').value)
-      document.getElementById('wd-url-input').value = d.target_url;
+    document.getElementById('wd-status').textContent=d.active?'🟢 ACTIVO':'🔴 INACTIVO';
+    document.getElementById('wd-status').style.color=d.active?'#3fb950':'#f85149';
+    document.getElementById('wd-last').textContent=d.last_check_str||'nunca';
+    document.getElementById('wd-pc').textContent=d.last_status||'—';
+    document.getElementById('wd-fails').textContent=d.consecutive_fails;
+    if(d.target_url&&!document.getElementById('wd-url-input').value)
+      document.getElementById('wd-url-input').value=d.target_url;
   });
 }
 
 function fetchLogs(){
   fetch('/api/logs?offset='+logOffset).then(r=>r.json()).then(d=>{
-    if(!d.entries.length) return;
-    const con = document.getElementById('console');
+    if(!d.entries.length)return;
+    const con=document.getElementById('console');
     d.entries.forEach(e=>{
-      const div = document.createElement('div');
-      div.className = 'log-line '+e.cls;
-      div.innerHTML = `<span class="ts">${e.t}</span><span class="lvl">${e.level.padEnd(5)}</span>${esc(e.msg)}`;
+      const div=document.createElement('div');
+      div.className='log-line '+e.cls;
+      div.innerHTML=`<span class="ts">${e.t}</span><span class="lvl">${e.level.padEnd(5)}</span>${esc(e.msg)}`;
       con.appendChild(div);
     });
-    logOffset += d.entries.length;
-    if(autoScroll) con.scrollTop = con.scrollHeight;
+    logOffset+=d.entries.length;
+    if(autoScroll)con.scrollTop=con.scrollHeight;
   });
 }
 
-fetchStatus(); fetchWatchdog(); fetchLogs();
-setInterval(fetchStatus, 2000);
-setInterval(fetchWatchdog, 5000);
-setInterval(fetchLogs, 1000);
+fetchStatus();fetchWatchdog();fetchLogs();
+setInterval(fetchStatus,2000);
+setInterval(fetchWatchdog,5000);
+setInterval(fetchLogs,1000);
 </script>
 </body>
 </html>"""
@@ -377,9 +418,6 @@ def api_control():
         _state["active"] = False
         logger.info("■ Pipeline DETENIDO desde dashboard")
         _broadcast("😴 Pipeline *DETENIDO* desde el dashboard web.")
-    elif action in ("mode_auto", "mode_manual", "mode_both"):
-        _state["mode"] = action.replace("mode_", "")
-        logger.info(f"🔀 Modo cambiado a: {_state['mode']}")
     return jsonify({"ok": True}), 200
 
 @flask_app.route("/api/watchdog/status")
@@ -839,7 +877,7 @@ def _gmail_loop():
     logger.info(f"📧 Gmail polling iniciado ({GMAIL_POLL_INT}s) → {GMAIL_USER}")
     while True:
         try:
-            if _state["active"] and not _state["processing"] and _state["mode"] in ("auto", "both"):
+            if _state["active"] and not _state["processing"]:
                 images = _fetch_new_images()
                 for img in images:
                     asyncio.run(_pipeline(img, "gmail"))
@@ -868,25 +906,6 @@ def _telegram_loop():
                     continue
 
                 # ── Foto (modo manual) ────────────────────
-                if "photo" in msg and _state["mode"] in ("manual", "both"):
-                    if not _state["active"]:
-                        _send(chat_id, "😴 Pipeline inactivo. Envía `start` para activarlo.")
-                        continue
-                    if _state["processing"]:
-                        _send(chat_id, "⏳ Procesando otra imagen, espera...")
-                        continue
-                    photos  = msg["photo"]
-                    file_id = sorted(photos, key=lambda p: p.get("file_size", 0))[-1]["file_id"]
-                    img     = _download_tg_photo(file_id)
-                    if img:
-                        threading.Thread(
-                            target=lambda i=img: asyncio.run(_pipeline(i, "telegram")),
-                            daemon=True
-                        ).start()
-                    else:
-                        _send(chat_id, "❌ Error descargando imagen.")
-                    continue
-
                 # ── Comandos de texto ─────────────────────
                 text = msg.get("text", "").strip().lower()
                 if not text:
@@ -896,34 +915,21 @@ def _telegram_loop():
                     _state["debug"] = True
                     _send(chat_id,
                         "🔬 *Modo DEBUG activado*\n"
-                        "Recibirás cada paso del pipeline en tiempo real:\n"
-                        "OCR → fallbacks → votos → consenso → resultado\n"
+                        "Recibirás cada paso en tiempo real.\n"
                         "Envía `debug off` para desactivar."
                     )
 
                 elif text in ("debug off", "/debugoff"):
                     _state["debug"] = False
-                    _send(chat_id, "🔬 Modo DEBUG *desactivado* — solo recibes el resultado final.")
+                    _send(chat_id, "🔬 Modo DEBUG *desactivado*.")
 
                 elif text in ("start", "/start", "activar"):
                     _state["active"] = True
-                    _send(chat_id, "✅ Pipeline *ACTIVADO*.")
+                    _send(chat_id, "✅ Pipeline *ACTIVADO* — monitoreando Gmail.")
 
                 elif text in ("stop", "/stop", "parar"):
                     _state["active"] = False
                     _send(chat_id, "😴 Pipeline *DESACTIVADO*.")
-
-                elif text in ("auto", "/auto"):
-                    _state["mode"] = "auto"
-                    _send(chat_id, "🔀 Modo: *AUTO* (monitorea Gmail)")
-
-                elif text in ("manual", "/manual"):
-                    _state["mode"] = "manual"
-                    _send(chat_id, "🔀 Modo: *MANUAL* (envíame una foto)")
-
-                elif text in ("both", "/both", "ambos"):
-                    _state["mode"] = "both"
-                    _send(chat_id, "🔀 Modo: *AMBOS* (Gmail + Telegram)")
 
                 elif text in ("status", "/status", "estado"):
                     uptime = round((time.time() - _state["start_time"]) / 60)
@@ -932,7 +938,6 @@ def _telegram_loop():
                     _send(chat_id,
                         f"🤖 *Pipeline Status*\n"
                         f"Estado:    {estado}\n"
-                        f"Modo:      `{_state['mode'].upper()}`\n"
                         f"Debug:     {debug}\n"
                         f"Uptime:    {uptime} min\n"
                         f"Procesados:{_state['processed']}\n"
@@ -945,13 +950,10 @@ def _telegram_loop():
                         "🤖 *AI Pipeline — Comandos*\n\n"
                         "`start`     — Activar pipeline\n"
                         "`stop`      — Desactivar\n"
-                        "`auto`      — Modo Gmail automático\n"
-                        "`manual`    — Modo Telegram (envía foto)\n"
-                        "`both`      — Ambos modos\n"
-                        "`debug`     — Activar modo depuración\n"
+                        "`debug`     — Activar depuración paso a paso\n"
                         "`debug off` — Desactivar depuración\n"
                         "`status`    — Ver estado\n"
-                        "📸 En modo manual/both: envía foto directo"
+                        "`help`      — Esta ayuda"
                     )
 
         except Exception as e:
