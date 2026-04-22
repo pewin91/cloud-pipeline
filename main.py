@@ -460,6 +460,12 @@ def _tg(method: str, params: dict = None) -> dict:
         req = urllib.request.Request(url, data=data, method="POST")
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 409:
+            logger.debug(f"TG [{method}]: 409 (otro cliente activo — ignorado)")
+        else:
+            logger.error(f"TG [{method}]: HTTP {e.code}")
+        return {"ok": False}
     except Exception as e:
         logger.error(f"TG [{method}]: {e}")
         return {"ok": False}
