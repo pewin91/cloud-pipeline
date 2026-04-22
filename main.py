@@ -130,8 +130,10 @@ def _fetch_new_images() -> list[bytes]:
             msg = email_lib.message_from_bytes(raw)
 
             found = False
+            parts_found = []
             for part in msg.walk():
                 ctype = part.get_content_type()
+                parts_found.append(ctype)
                 if ctype.startswith("image/"):
                     payload = part.get_payload(decode=True)
                     if payload:
@@ -139,12 +141,22 @@ def _fetch_new_images() -> list[bytes]:
                         logger.info(f"  📎 Imagen encontrada ({len(payload)} bytes, {ctype})")
                         found = True
                         break  # una imagen por email
+                # También intentar extraer imágenes de partes multipart/related
+                elif ctype in ("application/octet-stream",):
+                    disp = str(part.get("Content-Disposition", ""))
+                    if "attachment" in disp or "inline" in disp:
+                        payload = part.get_payload(decode=True)
+                        if payload and len(payload) > 1000:
+                            images.append(payload)
+                            logger.info(f"  📎 Adjunto binario ({len(payload)} bytes)")
+                            found = True
+                            break
 
             # Marcar como leído independientemente de si había imagen
             conn.store(uid, "+FLAGS", "\\Seen")
 
             if not found:
-                logger.debug(f"  Email sin imagen — ignorado")
+                logger.info(f"  ⚠ Email sin imagen — partes MIME: {parts_found}")
 
     except Exception as e:
         logger.error(f"IMAP fetch: {e}")
